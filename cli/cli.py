@@ -48,3 +48,71 @@ def add_thought(text, source, mood):
     conn.commit()
     conn.close()
     click.echo("Thought added successfully.")
+
+@cli.command()
+def list_thoughts():
+    """List all recent thoughts"""
+    from db.connection import get_connection
+    conn = get_connection()
+    cur = conn.cursor()
+
+    # Join with sources to get the label
+    cur.execute("""
+        SELECT t.id, t.text, t.timestamp, t.mood, s.label
+        FROM thoughts t
+        LEFT JOIN sources s ON t.source_id = s.id
+        ORDER BY t.timestamp DESC
+    """)
+
+    rows = cur.fetchall()
+
+    if not rows:
+        click.echo("No thoughts found.")
+        return
+
+    for row in rows:
+        id, text, timestamp, mood, source = row
+        click.echo(f"\n Thought #{id}")
+        click.echo(f"Text     : {text}")
+        if mood:
+            click.echo(f"Mood     : {mood}")
+        if source:
+            click.echo(f"Source   : {source}")
+        click.echo(f"Time     : {timestamp}")
+
+    conn.close()
+
+@cli.command
+@click.option('--keyword', prompt='Search keyword', help='Keyword to search for in thoughts')
+def search_thoughts(keyword):
+    """Search for thoughtd containing a keyword."""
+    from db.connection import get_connection
+    conn = get_connection()
+    cur = conn.cursor()
+
+    query = """
+        SELECT t.id, t.text, t.timestamp, t.mood, s.label
+        FROM thoughts t
+        LEFT JOIN sources s ON t.source_id = s.id
+        WHERE LOWER(t.text) LIKE %S
+        ORDER BY t.timestamp DESC
+    """
+    keyword_pattern = f"%{keyword.lower()}%"
+    cur.execute(query, (keyword_pattern,))
+    results = cur.fetchall()
+
+    if not results:
+        click.echo("No thoughts matched that keyword.")
+        return
+    
+    for row in results:
+        id, text, timestamp, mood, source = row
+        click.echo(f"\n Thought #{id}")
+        click.echo(f"Text    : {text}")
+        if mood:
+            click.echo(f"Mood    : {mood}")
+        if source:
+            click.echo(f"source   : {source}")
+        click.echo(f"Time    : {timestamp}")
+
+    conn.close()
